@@ -119,7 +119,7 @@ static void pl011_uart_handle_irq(ps_chardevice_t *dev)
     pl011_regs_t *r = pl011_uart_get_priv(dev);
 
     // Clear (all) interrupts
-    r->icr = 0x7ff;
+    r->icr = 0x7f0;
 }
 
 static int pl011_uart_cr_configure(ps_chardevice_t *dev)
@@ -158,20 +158,33 @@ static int pl011_uart_baudrate_div_configure(ps_chardevice_t *dev)
 {
     // Base UART clock according to https://github.com/raspberrypi/firmware/issues/951
     const uint32_t freq_uart_clk = 48000000;
-    const uint32_t baud_rate = 115200;
+    // const uint32_t baud_rate = 115200;
+    uint32_t baud_rate;
+    switch (dev->id) {
+        case BCM2xxx_UART3: // Telemetry
+            baud_rate = 57600;
+            break;
+        default:
+            baud_rate = 115200;
+            break;
+    }
 
-    double baud_div = (double) freq_uart_clk / (double)(16.0 * baud_rate);
-    double frac_div = baud_div - (uint32_t) baud_div;
+    // double baud_div = (double) freq_uart_clk / (double)(16.0 * baud_rate);
+    // double frac_div = baud_div - (uint32_t) baud_div;
+    uint32_t divisor = (freq_uart_clk * 4) / baud_rate;
+    uint32_t val;
     pl011_regs_t *r = pl011_uart_get_priv(dev);
 
     // Set IBRD register
-    uint32_t val = r->ibrd;
-    val |= (uint32_t) baud_div;
+    // uint32_t val = r->ibrd;
+    // val |= (uint32_t) baud_div;
+    val = divisor >> 6;
     r->ibrd = val;
 
     // Set FBRD register
-    val = r->fbrd;
-    val |= (uint32_t)(frac_div * 64.0 + 0.5);
+    // val = r->fbrd;
+    // val |= (uint32_t)(frac_div * 64.0 + 0.5);
+    val = divisor & 0x3f;
     r->fbrd = val;
 
     return 0;
@@ -227,7 +240,8 @@ static int pl011_uart_configure(ps_chardevice_t *dev)
      *
      */
     // Enable FIFO
-    //pl011_uart_enable_fifo(dev);
+    // colored-dye (2023/03/22): enable FIFO
+    pl011_uart_enable_fifo(dev);
 
     // Enable UART
     pl011_uart_enable(dev);
@@ -300,7 +314,8 @@ int pl011_uart_init(const struct dev_defn *defn, const ps_io_ops_t *ops, ps_char
     dev->handle_irq = &pl011_uart_handle_irq;
     dev->irqs       = defn->irqs;
     dev->ioops      = *ops;
-    dev->flags      = SERIAL_AUTO_CR;
+    // dev->flags      = SERIAL_AUTO_CR;
+    dev->flags      = 0;
 
     pl011_uart_configure(dev);
 
@@ -314,17 +329,21 @@ int pl011_uart_getchar(ps_chardevice_t *d)
 
     // Only if receive FIFO is not empty
     if (!(r->fr & FR_RXFE)) {
-        ch = (int)(r->dr & MASK(8));
-    }
+        ch = (int)(r->dr);
+        if (ch & 0xff00) {
+            LOG_ERROR("ERROR: %04X", ch & 0xff00);
+        }
+        ch &= MASK(8);
+     }
 
     return ch;
 }
 
 int pl011_uart_putchar(ps_chardevice_t *d, int c)
 {
-    if ((d->flags & SERIAL_AUTO_CR) && ((char)c == '\n')) {
-        pl011_uart_putchar(d, '\r');
-    }
+    // if ((d->flags & SERIAL_AUTO_CR) && ((char)c == '\n')) {
+    //     pl011_uart_putchar(d, '\r');
+    // }
 
     pl011_regs_t *r = pl011_uart_get_priv(d);
 

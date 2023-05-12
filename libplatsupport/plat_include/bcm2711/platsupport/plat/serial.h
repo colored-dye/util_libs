@@ -72,8 +72,8 @@
 #define UART4_IRQ  153
 #define UART5_IRQ  153
 
-#define DEFAULT_SERIAL_PADDR      UART1_PADDR
-#define DEFAULT_SERIAL_INTERRUPT  UART1_IRQ
+#define DEFAULT_SERIAL_PADDR      UART0_PADDR
+#define DEFAULT_SERIAL_INTERRUPT  UART0_IRQ
 
 
 enum chardev_id {
@@ -96,5 +96,5 @@ enum chardev_id {
     PS_SERIAL5 = BCM2xxx_UART5,
 
     /* Defaults */
-    PS_SERIAL_DEFAULT = BCM2xxx_UART1
+    PS_SERIAL_DEFAULT = BCM2xxx_UART0
 };
